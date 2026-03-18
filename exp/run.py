@@ -2,6 +2,7 @@
 # Copyright 2022 Twitter, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+import enum
 from math import e
 import sys
 import os
@@ -135,33 +136,44 @@ def run_exp(args, dataset, model_cls, fold):
     if (hasattr(model, '_last_maps') and model._last_maps is not None) and (hasattr(model, '_last_laplacian') and model._last_laplacian[0] is not None):
         
         # print(f"maps: {model._last_maps.detach().cpu().numpy()}")
-        print(f"maps dimensions: {model._last_maps.detach().cpu().numpy().shape}")
+        # print(f"maps dimensions: {model._last_maps.detach().cpu().numpy().shape}")
+
+        # lap_indices = model._last_laplacian[0].detach().cpu()
+        # maps = model._last_maps.detach().cpu()
         
-        maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps'))
+        # for layer, lap in model._last_laplacian.items():
+        #     print(f"{layer} Laplacian indices: {lap[0].detach().cpu().numpy()}")
+        
+        maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps',f'{args["dataset"]}', f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
         os.makedirs(maps_dir, exist_ok=True)
 
-        lap_indices = model._last_laplacian[0].detach().cpu()
-        maps = model._last_maps.detach().cpu()
+        for layer, maps in model._last_maps.items():
+            
+            print(type(maps))
+            print(maps)
+            maps = maps.detach().cpu()
+            # print(f"{layer}: {maps.detach().cpu().numpy()}")
+            lap_indices = model._last_laplacian[layer][0].detach().cpu()
+        
+            if maps.dim() == 0:
+                maps = maps.unsqueeze(0)
+            if maps.dim() == 1:
+                maps_cols = maps.unsqueeze(1)
+            else:
+                maps_cols = maps.reshape(maps.shape[0], -1)
 
-        if maps.dim() == 0:
-            maps = maps.unsqueeze(0)
-        if maps.dim() == 1:
-            maps_cols = maps.unsqueeze(1)
-        else:
-            maps_cols = maps.reshape(maps.shape[0], -1)
+            if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
+                raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
 
-        if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
-            raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
+            num_entries = min(lap_indices.size(1), maps_cols.size(0))
+            edge_cols = lap_indices[:, :num_entries].t().to(maps_cols.dtype)
+            maps_matrix = torch.cat([edge_cols, maps_cols[:num_entries]], dim=1)
 
-        num_entries = min(lap_indices.size(1), maps_cols.size(0))
-        edge_cols = lap_indices[:, :num_entries].t().to(maps_cols.dtype)
-        maps_matrix = torch.cat([edge_cols, maps_cols[:num_entries]], dim=1)
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        maps_filename = f"{args['model']}_{args['dataset']}_fold{fold}_seed{args['seed']}_{timestamp}.pt"
-        maps_path = os.path.join(maps_dir, maps_filename)
-        torch.save(maps_matrix, maps_path)
-        print(f"Saved edge-map matrix to {maps_path} with shape {tuple(maps_matrix.shape)}")
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            maps_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}_{timestamp}.pt"
+            maps_path = os.path.join(maps_dir, maps_filename)
+            torch.save(maps_matrix, maps_path)
+            print(f"Saved edge-map matrix to {maps_path} with shape {tuple(maps_matrix.shape)}")
 
     wandb.log({'best_test_acc': test_acc, 'best_val_acc': best_val_acc, 'best_epoch': best_epoch})
     keep_running = False if test_acc < args['min_acc'] else True
