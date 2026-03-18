@@ -50,6 +50,8 @@ class LocalConcatSheafLearner(SheafLearner):
         maps = self.linear1(torch.cat([x_row, x_col], dim=1))
         maps = self.act(maps)
 
+        #print(maps,edge_index)
+
         # sign = maps.sign()
         # maps = maps.abs().clamp(0.05, 1.0) * sign
 
@@ -87,6 +89,9 @@ class LocalConcatSheafLearnerVariant(SheafLearner):
             raise ValueError(f"Unsupported act {sheaf_act}")
 
     def forward(self, x, edge_index):
+
+        """Seleziona le righe corrispondenti a row e col da x, concatena le caratteristiche e passa attraverso un layer lineare e un'attivazione."""
+
         row, col = edge_index
 
         x_row = torch.index_select(x, dim=0, index=row)
@@ -109,6 +114,10 @@ class LocalConcatSheafLearnerVariant(SheafLearner):
 
 
 class AttentionSheafLearner(SheafLearner):
+
+    """Utilizza l'attention per costruire le mappe di restrizione.
+    Concatena le caratteristiche dei nodi, le passa attraverso un layer lineare
+    e poi applica softmax per ottenere le mappe di restrizione."""
 
     def __init__(self, in_channels, d):
         super(AttentionSheafLearner, self).__init__()

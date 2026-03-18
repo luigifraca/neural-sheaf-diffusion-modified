@@ -2,10 +2,13 @@
 # Copyright 2022 Twitter, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+from math import e
 import sys
 import os
 import random
+from datetime import datetime
 import torch
+import pandas as pd
 import torch.nn.functional as F
 import git
 import numpy as np
@@ -129,11 +132,41 @@ def run_exp(args, dataset, model_cls, fold):
             for i in range(0, args['layers']):
                 print(f"Epsilons {i}: {model.epsilons[i].detach().cpu().numpy().flatten()}")
 
+    if (hasattr(model, '_last_maps') and model._last_maps is not None) and (hasattr(model, '_last_laplacian') and model._last_laplacian[0] is not None):
+        
+        # print(f"maps: {model._last_maps.detach().cpu().numpy()}")
+        print(f"maps dimensions: {model._last_maps.detach().cpu().numpy().shape}")
+        
+        maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps'))
+        os.makedirs(maps_dir, exist_ok=True)
+
+        lap_indices = model._last_laplacian[0].detach().cpu()
+        maps = model._last_maps.detach().cpu()
+
+        if maps.dim() == 0:
+            maps = maps.unsqueeze(0)
+        if maps.dim() == 1:
+            maps_cols = maps.unsqueeze(1)
+        else:
+            maps_cols = maps.reshape(maps.shape[0], -1)
+
+        if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
+            raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
+
+        num_entries = min(lap_indices.size(1), maps_cols.size(0))
+        edge_cols = lap_indices[:, :num_entries].t().to(maps_cols.dtype)
+        maps_matrix = torch.cat([edge_cols, maps_cols[:num_entries]], dim=1)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        maps_filename = f"{args['model']}_{args['dataset']}_fold{fold}_seed{args['seed']}_{timestamp}.pt"
+        maps_path = os.path.join(maps_dir, maps_filename)
+        torch.save(maps_matrix, maps_path)
+        print(f"Saved edge-map matrix to {maps_path} with shape {tuple(maps_matrix.shape)}")
+
     wandb.log({'best_test_acc': test_acc, 'best_val_acc': best_val_acc, 'best_epoch': best_epoch})
     keep_running = False if test_acc < args['min_acc'] else True
 
     return test_acc, best_val_acc, keep_running
-
 
 if __name__ == '__main__':
     parser = get_parser()
@@ -189,6 +222,15 @@ if __name__ == '__main__':
         if not keep_running:
             break
 
+    # if hasattr(model_cls, '_last_maps') and model_cls._last_maps is not None:
+    #     maps_dir = r"results/maps"
+    #     os.makedirs(maps_dir, exist_ok=True)
+
+    #     maps_filename = f"{args['model']}_{args['dataset']}_fold{fold}_seed{args['seed']}.pt"
+    #     maps_path = os.path.abspath(os.path.join(maps_dir, maps_filename))
+    #     torch.save(model_cls._last_maps.detach().cpu(), maps_path)
+    #     print(f"Saved last restriction maps to {maps_path}")
+
     test_acc_mean, val_acc_mean = np.mean(results, axis=0) * 100
     test_acc_std = np.sqrt(np.var(results, axis=0)[0]) * 100
 
@@ -199,4 +241,3 @@ if __name__ == '__main__':
     model_name = args.model if args.evectors == 0 else f"{args.model}+LP{args.evectors}"
     print(f'{model_name} on {args.dataset} | SHA: {sha}')
     print(f'Test acc: {test_acc_mean:.4f} +/- {test_acc_std:.4f} | Val acc: {val_acc_mean:.4f}')
-

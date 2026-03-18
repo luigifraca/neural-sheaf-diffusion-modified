@@ -2,16 +2,16 @@
 
 python -m exp.run \
     --add_hp=False \
-    --add_lp=True \
-    --d=4 \
+    --add_lp=False \
+    --d=1 \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
     --epochs=500 \
-    --folds=10 \
-    --hidden_channels=16 \
+    --folds=1 \
+    --hidden_channels=32 \
     --input_dropout=0.2 \
-    --layers=2 \
+    --layers=5 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \

@@ -5,6 +5,8 @@ import torch
 import torch.nn.functional as F
 import torch_sparse
 
+#import Tuple
+
 from torch import nn
 from models.sheaf_base import SheafDiffusion
 from models import laplacian_builders as lb
@@ -32,7 +34,11 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
 
         self.sheaf_learners = nn.ModuleList()
 
+        """Abbiamo un MLP per ogni layer, ma se non usiamo la non linearità allora ne usiamo solo uno e lo condividiamo tra i layer.
+        Questo è perché se non usiamo la non linearità allora il modello è equivalente a un modello con un solo layer di apprendimento della sheaf, quindi non ha senso avere più di un MLP."""
+
         num_sheaf_learners = min(self.layers, self.layers if self.nonlinear else 1)
+
         for i in range(num_sheaf_learners):
             if self.sparse_learner:
                 self.sheaf_learners.append(LocalConcatSheafLearnerVariant(self.final_d,
@@ -40,6 +46,8 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
             else:
                 self.sheaf_learners.append(LocalConcatSheafLearner(
                     self.hidden_dim, out_shape=(self.d,), sheaf_act=self.sheaf_act))
+
+        
         self.laplacian_builder = lb.DiagLaplacianBuilder(self.graph_size, edge_index, d=self.d,
                                                          normalised=self.normalised,
                                                          deg_normalised=self.deg_normalised,
@@ -53,8 +61,15 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
         if self.second_linear:
             self.lin12 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.lin2 = nn.Linear(self.hidden_dim, self.output_dim)
+        
+        # self._last_maps = None
+        # self._last_trans_maps = None
+        # self._last_laplacian = None
 
     def forward(self, x):
+
+        print(f"Input x size: {x.detach().cpu().numpy().shape}")
+
         x = F.dropout(x, p=self.input_dropout, training=self.training)
         x = self.lin1(x)
         if self.use_act:
@@ -63,14 +78,29 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
         if self.second_linear:
             x = self.lin12(x)
         x = x.view(self.graph_size * self.final_d, -1)
+        #print(f"After initial linear layers x size: {x.detach().cpu().numpy().shape}")
 
         x0 = x
+        self._last_maps = {}
+        self._last_trans_maps = {}
+        self._last_laplacian = {}
+
         for layer in range(self.layers):
             if layer == 0 or self.nonlinear:
                 x_maps = F.dropout(x, p=self.dropout if layer > 0 else 0., training=self.training)
                 maps = self.sheaf_learners[layer](x_maps.reshape(self.graph_size, -1), self.edge_index)
+
+                # print maps to see them
+                #print(f"Layer {layer} maps: {maps.detach().cpu().numpy()}, maps length: {maps.size(0)}, edge_index: {self.edge_index}, len edge_index: {self.edge_index.size(1)}")
                 L, trans_maps = self.laplacian_builder(maps)
                 self.sheaf_learners[layer].set_L(trans_maps)
+
+                self._last_maps[layer] = maps
+                self._last_trans_maps[layer] = trans_maps
+                self._last_laplacian[layer] = L
+
+                # print(f"Layer {layer} maps: {self._last_maps.detach().cpu().numpy()}")
+                # print(f"Layer {layer} Laplacian: {self._last_laplacian[0].detach().cpu().numpy()}, {self._last_laplacian[1].detach().cpu().numpy()}")
 
             x = F.dropout(x, p=self.dropout, training=self.training)
 
@@ -94,7 +124,6 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
         x = x.reshape(self.graph_size, -1)
         x = self.lin2(x)
         return F.log_softmax(x, dim=1)
-
 
 class DiscreteBundleSheafDiffusion(SheafDiffusion):
 
