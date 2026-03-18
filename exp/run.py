@@ -169,8 +169,8 @@ def run_exp(args, dataset, model_cls, fold):
             edge_cols = lap_indices[:, :num_entries].t().to(maps_cols.dtype)
             maps_matrix = torch.cat([edge_cols, maps_cols[:num_entries]], dim=1)
 
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            maps_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}_{timestamp}.pt"
+            # timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            maps_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}.pt"
             maps_path = os.path.join(maps_dir, maps_filename)
             torch.save(maps_matrix, maps_path)
             print(f"Saved edge-map matrix to {maps_path} with shape {tuple(maps_matrix.shape)}")

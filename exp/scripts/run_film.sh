@@ -4,13 +4,13 @@ python -m exp.run \
     --add_hp=False \
     --add_lp=False \
     --d=1 \
-    --dataset=wisconsin \
+    --dataset=film \
     --dropout=0.7276458263736642 \
     --early_stopping=200 \
     --epochs=300 \
     --folds=1 \
     --hidden_channels=16 \
-    --input_dropout=0 \
+    --input_dropout=0.5 \
     --layers=2 \
     --lr=0.02 \
     --model=DiagSheaf \
