@@ -11,4 +11,4 @@
 \\
 3. Action points:
 - more datasets (w/ bottlenecks) -> see [BUNDLE NEURAL NETWORKS FOR MESSAGE DIFFUSION ON GRAPHS](https://arxiv.org/pdf/2405.15540)
--
+- talk to Alessio for continuous models + asymptotics
