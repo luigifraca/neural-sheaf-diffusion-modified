@@ -7,11 +7,11 @@ python -m exp.run \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
-    --epochs=10 \
+    --epochs=501 \
     --folds=10 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=1 \
+    --layers=10 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
