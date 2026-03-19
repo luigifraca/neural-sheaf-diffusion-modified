@@ -7,8 +7,8 @@ python -m exp.run \
     --dataset=wisconsin \
     --dropout=0.7276458263736642 \
     --early_stopping=200 \
-    --epochs=300 \
-    --folds=1 \
+    --epochs=500 \
+    --folds=10 \
     --hidden_channels=16 \
     --input_dropout=0 \
     --layers=2 \

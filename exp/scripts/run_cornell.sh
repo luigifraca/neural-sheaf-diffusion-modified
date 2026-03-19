@@ -3,15 +3,15 @@
 python -m exp.run \
     --add_hp=False \
     --add_lp=False \
-    --d=1 \
+    --d=4 \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
-    --epochs=500 \
+    --epochs=10 \
     --folds=10 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=12 \
+    --layers=1 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
