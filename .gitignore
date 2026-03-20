@@ -2,7 +2,7 @@
 *.py[cod]
 *.pytest_cache
 .idea/
-datasets/
+#datasets/
 wandb/
 *.DS_Store
 *results/maps/*
