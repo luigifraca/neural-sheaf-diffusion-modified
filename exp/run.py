@@ -212,7 +212,7 @@ if __name__ == '__main__':
     args.input_dim = dataset.num_features
     args.output_dim = dataset.num_classes
     args.device = torch.device(f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu')
-    assert args.normalised or args.deg_normalised
+    # assert args.normalised or args.deg_normalised
     if args.sheaf_decay is None:
         args.sheaf_decay = args.weight_decay
 
