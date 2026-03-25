@@ -3,15 +3,15 @@
 python -m exp.run \
     --add_hp=False \
     --add_lp=False \
-    --d=4 \
+    --d=1 \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
     --epochs=501 \
-    --folds=10 \
+    --folds=1 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=10 \
+    --layers=1 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
@@ -19,7 +19,8 @@ python -m exp.run \
     --left_weights=True \
     --right_weights=True \
     --use_act=True \
-    --normalised=True \
+    --normalised=False \
     --edge_weights=True \
     --sparse_learner=False \
+    --deg_normalised=False \
     --entity="${ENTITY}"
