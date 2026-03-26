@@ -8,12 +8,12 @@ python -m exp.run \
     --left_weights=True \
     --right_weights=True \
     --lr=0.02 \
-    --epochs=300 \
+    --epochs=500 \
     --weight_decay=5e-3 \
     --input_dropout=0.0 \
     --dropout=0.7 \
     --use_act=True \
-    --folds=1 \
+    --folds=10 \
     --model=DiagSheaf \
     --normalised=True \
     --sparse_learner=True \
