@@ -110,7 +110,9 @@ class LaplacianBuilder(nn.Module):
 
 class DiagLaplacianBuilder(LaplacianBuilder):
     """Learns a a Sheaf Laplacian with diagonal restriction maps"""
-
+    # Normalized = normalize by the diagonal entries of the Laplacian
+    # Deg_normalised = normalize by the degree of the nodes. 
+    # The former is more expensive but ensures the Laplacian has eigenvalues in [0, 2], while the latter is cheaper and ensures eigenvalues are O(1) in the maximum degree.
     def __init__(self, size, edge_index, d, normalised=False, deg_normalised=False, add_hp=False, add_lp=False,
                  augmented=True):
         super(DiagLaplacianBuilder, self).__init__(
@@ -142,6 +144,7 @@ class DiagLaplacianBuilder(LaplacianBuilder):
         row, _ = self.edge_index
 
         # Compute the un-normalised Laplacian entries.
+        # Tril maps are -2 * x_i * x_j, and diag maps are sum of squares of the incident maps.
         left_maps = torch.index_select(maps, index=left_idx, dim=0)
         right_maps = torch.index_select(maps, index=right_idx, dim=0)
         tril_maps = -left_maps * right_maps

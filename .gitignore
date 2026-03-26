@@ -5,6 +5,6 @@
 #datasets/
 wandb/
 *.DS_Store
-*results/maps/*
+*results/*
 *exp/scripts/*
 *.venv/*

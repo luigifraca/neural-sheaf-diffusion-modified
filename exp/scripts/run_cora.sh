@@ -11,7 +11,7 @@ python -m exp.run \
     --folds=1 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=3 \
+    --layers=2 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \

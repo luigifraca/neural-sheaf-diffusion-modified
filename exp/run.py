@@ -133,7 +133,9 @@ def run_exp(args, dataset, model_cls, fold):
             for i in range(0, args['layers']):
                 print(f"Epsilons {i}: {model.epsilons[i].detach().cpu().numpy().flatten()}")
 
-    if (hasattr(model, '_last_maps') and model._last_maps is not None) and (hasattr(model, '_last_laplacian') and model._last_laplacian[0] is not None):
+    if (hasattr(model, '_last_maps') and model._last_maps is not None) \
+        and (hasattr(model, '_last_laplacian') and model._last_laplacian[0] is not None) \
+        and (hasattr(model, '_last_laplacian') and model._last_laplacian[1] is not None):
         
         # print(f"maps: {model._last_maps.detach().cpu().numpy()}")
         # print(f"maps dimensions: {model._last_maps.detach().cpu().numpy().shape}")
@@ -144,8 +146,25 @@ def run_exp(args, dataset, model_cls, fold):
         # for layer, lap in model._last_laplacian.items():
         #     print(f"{layer} Laplacian indices: {lap[0].detach().cpu().numpy()}")
         
-        maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps',f'{args["dataset"]}', f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
+        maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps',f'{args["dataset"]}', f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
+        lap_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'laplacians',f'{args["dataset"]}', f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
+        
         os.makedirs(maps_dir, exist_ok=True)
+        os.makedirs(lap_dir, exist_ok=True)
+
+        for layer, lap in model._last_laplacian.items():
+            lap_indices = lap[0].detach().cpu()
+            lap_values = lap[1].detach().cpu()
+
+            if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
+                raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
+
+            lap_matrix = torch.cat([lap_indices, lap_values.unsqueeze(0)], dim=0)
+
+            lap_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}.pt"
+            lap_path = os.path.join(lap_dir, lap_filename)
+            torch.save(lap_matrix, lap_path)
+            print(f"Saved Laplacian to {lap_path} with shape {tuple(lap_matrix.shape)}")
 
         for layer, maps in model._last_maps.items():
             
