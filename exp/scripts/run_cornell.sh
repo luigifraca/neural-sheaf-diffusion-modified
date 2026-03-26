@@ -7,11 +7,11 @@ python -m exp.run \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
-    --epochs=501 \
-    --folds=1 \
+    --epochs=500 \
+    --folds=10 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=1 \
+    --layers=3 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
@@ -19,7 +19,7 @@ python -m exp.run \
     --left_weights=True \
     --right_weights=True \
     --use_act=True \
-    --normalised=False \
+    --normalised=True \
     --edge_weights=True \
     --sparse_learner=False \
     --deg_normalised=False \
