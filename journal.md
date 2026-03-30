@@ -50,3 +50,9 @@
 - Francesco: estimate simple case for oversquashing sheaves
 - together: do visualizations and plots with the right notions of curvature Francesco would derive 
 
+# Luigi things to do 
+- Take, the graph, take the Laplacian, associate to each edge of the graph the weight w_uv = | \tilde{\Delta}_uv | (where \tilde{\Delta} is indeed the Laplacian you get from our code.)
+- so now you have a weight for each edge. Instead, you can assume your nodes to have weight = 1. 
+- for each edge, calculate the curvature as shown in FORMULA (11) of the paper https://arxiv.org/pdf/1607.08654 by Melanie Weber, Jurgen Jost et al. 
+- plot the curvature of each edge as we did in the initial plots with our first experiments
+- you can try also to put w(v) = degree of node v , for each node, if the previous plots are not very infomrative
