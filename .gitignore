@@ -7,4 +7,4 @@ wandb/
 *.DS_Store
 *results/*
 *exp/scripts/*
-*.venv/*
+.venv/
