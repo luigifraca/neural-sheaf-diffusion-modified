@@ -41,3 +41,12 @@
   - Reference: [Bundle Neural Networks for Message Diffusion on Graphs](https://arxiv.org/pdf/2405.15540)  
 - Discuss with **Alessio**  
   - Focus: continuous models + asymptotics  
+
+
+
+# 30/03 Journal , action points 
+
+- Luigi: read Forman-Bochner
+- Francesco: estimate simple case for oversquashing sheaves
+- together: do visualizations and plots with the right notions of curvature Francesco would derive 
+
