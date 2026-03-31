@@ -55,4 +55,10 @@
 - so now you have a weight for each edge. Instead, you can assume your nodes to have weight = 1. 
 - for each edge, calculate the curvature as shown in FORMULA (11) of the paper https://arxiv.org/pdf/1607.08654 by Melanie Weber, Jurgen Jost et al. 
 - plot the curvature of each edge as we did in the initial plots with our first experiments
-- you can try also to put w(v) = degree of node v , for each node, if the previous plots are not very infomrative
+- you can try also to put w(v) = degree of node v , for each node, if the previous plots are not very informative
+
+# Luigi other things to do 31/03
+- Do the visualization, transpose it, with cornell (2 or 3 layers, do both) and save it, we will use it in the slides 
+- Plot the histogram of the curvatures for each layer, and also plot the histogram of the topological edge-curvature
+- *topological edge curvature*: already done in other jupyters, get the boundary matrix, do B^T B, do fbc there, here you have it 
+- plot the histogram with Cora, 3 layers, and save it, no need to plot the cora graph as it is disconnected and visualization is bad, with cora plot only the histogram

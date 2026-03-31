@@ -7,11 +7,11 @@ python -m exp.run \
     --dataset=cora \
     --dropout=0.7 \
     --early_stopping=200 \
-    --epochs=300 \
+    --epochs=500 \
     --folds=1 \
     --hidden_channels=16 \
     --input_dropout=0.2 \
-    --layers=2 \
+    --layers=5 \
     --lr=0.02 \
     --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
