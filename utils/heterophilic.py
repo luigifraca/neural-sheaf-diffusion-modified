@@ -49,7 +49,7 @@ class Actor(InMemoryDataset):
     def __init__(self, root: str, transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None):
         super().__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
     @property
     def raw_file_names(self) -> List[str]:
@@ -148,7 +148,7 @@ class WikipediaNetwork(InMemoryDataset):
         self.name = name.lower()
         assert self.name in ['chameleon', 'squirrel']
         super().__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
     @property
     def raw_dir(self) -> str:
@@ -228,7 +228,7 @@ class WebKB(InMemoryDataset):
         assert self.name in ['cornell', 'texas', 'washington', 'wisconsin']
 
         super(WebKB, self).__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
     @property
     def raw_dir(self):
@@ -326,7 +326,7 @@ class SyntheticData(InMemoryDataset):
             for i in range(self.n_classes):
                 self.matriu_corr[i][i] = 1-self.het
         super(SyntheticData, self).__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
     @property
     def raw_dir(self):
@@ -420,10 +420,10 @@ class SyntheticData(InMemoryDataset):
         matriu_corr = self.matriu_corr
         #we try to read from data file the features, for fair comparison
         try:
-            x = torch.load(self.raw_dir+'/x_data.pt')
-            y = torch.load(self.raw_dir+'/y_data.pt')
+            x = torch.load(self.raw_dir+'/x_data.pt', weights_only=False)
+            y = torch.load(self.raw_dir+'/y_data.pt', weights_only=False)
             if self.just_add_noise:
-                class_params = torch.load(self.raw_dir+'/class_params.pt')
+                class_params = torch.load(self.raw_dir+'/class_params.pt', weights_only=False)
                 mean_class_params = torch.mean(class_params,dim=0)
                 noise = torch.normal(mean=torch.zeros(self.num_nodes,
                                                       self.num_feats,
@@ -438,7 +438,7 @@ class SyntheticData(InMemoryDataset):
             torch.save(x,self.raw_dir+'/x_data.pt')
             torch.save(y,self.raw_dir+'/y_data.pt')
         try:
-            edge_index = torch.load(self.raw_dir+'/edge_data.pt')
+            edge_index = torch.load(self.raw_dir+'/edge_data.pt', weights_only=False)
         except:
             edge_index = self.generate_edges(y)
             torch.save(edge_index,self.raw_dir+'/edge_data.pt')
@@ -446,7 +446,7 @@ class SyntheticData(InMemoryDataset):
         torch.save(self.collate(data),self.raw_dir+'/synthetic_data.pt')
 
     def process(self):
-        data = torch.load(self.raw_dir+'/synthetic_data.pt')
+        data = torch.load(self.raw_dir+'/synthetic_data.pt', weights_only=False)
         x = data[0].x
         y = data[0].y
 
@@ -523,7 +523,7 @@ def get_dataset(name, args):
     elif name == "synthetic_exp":
         dataset = SyntheticData(data_root,name, args)
     elif name == 'ogbn-arxiv':
-        dataset = torch.load(data_root+'/ogbn_arxiv/processed/geometric_data_processed.pt')
+        dataset = torch.load(data_root+'/ogbn_arxiv/processed/geometric_data_processed.pt', weights_only=False)
         edge_index = dataset[0].edge_index 
         edge_index,_ = remove_self_loops(edge_index)
         # Make the graph undirected

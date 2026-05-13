@@ -3,7 +3,7 @@
 python -m exp.run \
     --add_hp=False \
     --add_lp=False \
-    --d=2 \
+    --d=1 \
     --dataset=cornell \
     --dropout=0.7 \
     --early_stopping=200 \
@@ -13,7 +13,7 @@ python -m exp.run \
     --input_dropout=0.2 \
     --layers=2 \
     --lr=0.02 \
-    --model=BundleSheaf \
+    --model=DiagSheaf \
     --sheaf_decay=0.00031764232712732976 \
     --weight_decay=0.0006914841722570725 \
     --left_weights=True \

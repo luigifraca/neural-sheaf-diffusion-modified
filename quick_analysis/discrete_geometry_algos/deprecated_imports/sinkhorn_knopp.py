@@ -24,6 +24,13 @@ from .floyd_warshall import FloydWarshall
 
 __all__ = ['SinkhornKnopp']
 
+
+def _debug_tensor(name: str, tensor: torch.Tensor, debug: bool) -> None:
+    if debug:
+        print(f'[DEBUG] {name}: shape={tuple(tensor.shape)}, dtype={tensor.dtype}, device={tensor.device}')
+        print(tensor)
+
+
 class SinkhornKnopp(Wasserstein1Approximation):
     """
     The Sinkhorn-Knopp algorithm provides an efficient way to compute the Sinkhorn distance by solving an
@@ -52,7 +59,12 @@ class SinkhornKnopp(Wasserstein1Approximation):
     """
     fudge_factor = 1e-9
 
-    def __init__(self, r: torch.Tensor, c: torch.Tensor, cost_matrix: torch.Tensor, epsilon: float) -> None:
+    def __init__(self,
+                 r: torch.Tensor,
+                 c: torch.Tensor,
+                 cost_matrix: torch.Tensor,
+                 epsilon: float,
+                 debug: bool = False) -> None:
         """
         Default constructor for a user-provided cost matrix. The constructor throws two types of exceptions:
         - ValueError if constructor arguments are out of bounds
@@ -67,7 +79,13 @@ class SinkhornKnopp(Wasserstein1Approximation):
         @type cost_matrix:
         @param epsilon:  Entropy regularization
         @type epsilon: float
+        @param debug: If True, print intermediate tensors and shapes
+        @type debug: bool
         """
+        _debug_tensor('SinkhornKnopp.r.input', r, debug)
+        _debug_tensor('SinkhornKnopp.c.input', c, debug)
+        _debug_tensor('SinkhornKnopp.cost_matrix.input', cost_matrix, debug)
+
         if r.shape[0] != cost_matrix.shape[0]:
             raise ValueError(f'Shape of r distribution {r.shape[0]} should match cost_matrix {cost_matrix.shape[0]}')
         if c.shape[0] != cost_matrix.shape[1]:
@@ -79,6 +97,8 @@ class SinkhornKnopp(Wasserstein1Approximation):
         c = c.to(dtype=dtype, device=cost_matrix.device)
 
         r, c = SinkhornKnopp.__normalize_r_c(r, c)
+        _debug_tensor('SinkhornKnopp.r.normalized', r, debug)
+        _debug_tensor('SinkhornKnopp.c.normalized', c, debug)
         super(SinkhornKnopp, self).__init__(r, c)
 
         if epsilon < 0.001 or epsilon > 0.5:
@@ -89,15 +109,22 @@ class SinkhornKnopp(Wasserstein1Approximation):
 
         self.cost_matrix = SinkhornKnopp.__normalize_cost_matrix(cost_matrix)
         self.epsilon = epsilon
+        self.debug = debug
+        _debug_tensor('SinkhornKnopp.cost_matrix.normalized', self.cost_matrix, self.debug)
 
     @classmethod
-    def build(cls, r: torch.Tensor, c: torch.Tensor, floyd_warshall: FloydWarshall, epsilon: float) -> Self:
+    def build(cls,
+              r: torch.Tensor,
+              c: torch.Tensor,
+              floyd_warshall: FloydWarshall,
+              epsilon: float,
+              debug: bool = False) -> Self:
         """
         Alternative constructor for approximating the one dimensional Wasserstein distance. It takes a source
         probability distribution r, a destination probability distribution c, the Floyd-Warshall all-pairs
         shortest paths and entropy regularization factor.
 
-        @param r: Marginal probability distribution for source vertext
+        @param r: Marginal probability distribution for source vertex
         @type r: Torch Tensor
         @param c: Marginal probability distribution for destination vertex
         @type c: Torch Tensor
@@ -105,11 +132,13 @@ class SinkhornKnopp(Wasserstein1Approximation):
         @type floyd_warshall: FloydWarshall
         @param epsilon: Entropy regularization
         @type epsilon: float
+        @param debug: If True, print intermediate tensors and shapes
+        @type debug: bool
         @return: Instance of this class
         @rtype: SinkhornKnopp
         """
         cost_matrix = floyd_warshall()
-        return cls(r, c, cost_matrix, epsilon)
+        return cls(r, c, cost_matrix, epsilon, debug)
 
     def __str__(self) -> AnyStr:
         return (f'\nSource distribution: {self.r}\nTarget distribution {self.c}\nCost matrix {self.cost_matrix}'
@@ -139,8 +168,13 @@ class SinkhornKnopp(Wasserstein1Approximation):
         
         # K is the kernel matrix  K = exp(-M/epsilon)
         K = torch.exp(-self.cost_matrix / self.epsilon)
+        _debug_tensor('SinkhornKnopp.K', K, self.debug)
         u = torch.ones_like(self.r) / self.r.shape[0]
+        _debug_tensor('SinkhornKnopp.u.initial', u, self.debug)
         iters = n_iters
+
+        _debug_tensor('SinkhornKnopp.r.initial', self.r, self.debug)
+        _debug_tensor('SinkhornKnopp.c.initial', self.c, self.debug)
 
         # Normalization with a fudge factor to ensure convexity
         for i in range(n_iters):
@@ -154,6 +188,9 @@ class SinkhornKnopp(Wasserstein1Approximation):
         # Clean from init values
         self.cost_matrix[self.cost_matrix > 1e+5] = 0.0
         optimal_transport = torch.sum(u * torch.matmul(K * self.cost_matrix, v))
+        _debug_tensor('SinkhornKnopp.u.final', u, self.debug)
+        _debug_tensor('SinkhornKnopp.v.final', v, self.debug)
+        _debug_tensor('SinkhornKnopp.optimal_transport', optimal_transport, self.debug)
         return iters, optimal_transport
 
     """ -----------------  Private Helper Method ----------------------------- """
