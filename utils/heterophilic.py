@@ -463,6 +463,167 @@ class SyntheticData(InMemoryDataset):
         return '{}()'.format(self.name)
 
 
+class BottleneckData(InMemoryDataset):
+    def __init__(self, root, name, args, transform=None, pre_transform=None):
+        self.name = name.lower()
+        assert self.name in ['bottleneck_exp']
+        self.graph_type = args.bottleneck_graph.lower()
+        self.num_nodes = args.num_nodes
+        self.n_classes = args.num_classes
+        self.num_feats = args.num_feats
+        self.n_left = args.bottleneck_left
+        self.n_right = args.bottleneck_right
+        self.bridge_width = args.bridge_width
+        self.bridge_length = args.bridge_length
+        self.sbm_intra_prob = args.sbm_intra_prob
+        self.sbm_inter_prob = args.sbm_inter_prob
+        self.feature_mode = args.bottleneck_feature_mode.lower()
+        self.r = args.ellipsoid_radius
+        self.feat_noise = args.feat_noise
+        self.seed = args.seed
+        self._rng = np.random.default_rng(self.seed)
+        super(BottleneckData, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
+
+    @property
+    def raw_dir(self):
+        return osp.join(self.root, self.name, 'raw')
+
+    @property
+    def processed_dir(self):
+        return osp.join(self.root, self.name, 'processed')
+
+    @property
+    def raw_file_names(self):
+        return 'bottleneck_data.pt'
+
+    @property
+    def processed_file_names(self):
+        return 'data.pt'
+
+    def _add_undirected_edge(self, edges, u, v):
+        if u != v:
+            edges.add((min(u, v), max(u, v)))
+
+    def _edge_index_from_edges(self, edges):
+        edge_index = [[], []]
+        for u, v in sorted(edges):
+            edge_index[0] += [u, v]
+            edge_index[1] += [v, u]
+        return torch.tensor(edge_index, dtype=torch.long)
+
+    def _build_barbell(self):
+        if self.n_left <= 0 or self.n_right <= 0:
+            raise ValueError("bottleneck_left and bottleneck_right must be positive.")
+        bridge_length = self.bridge_length if self.graph_type == 'path_barbell' else 0
+        right_start = self.n_left + bridge_length
+        num_nodes = self.n_left + self.n_right + bridge_length
+        left_nodes = list(range(self.n_left))
+        bridge_nodes = list(range(self.n_left, right_start))
+        right_nodes = list(range(right_start, num_nodes))
+
+        edges = set()
+        for nodes in [left_nodes, right_nodes]:
+            for pos, u in enumerate(nodes):
+                for v in nodes[pos + 1:]:
+                    self._add_undirected_edge(edges, u, v)
+
+        width = max(1, self.bridge_width)
+        if bridge_nodes:
+            for k in range(width):
+                left = left_nodes[k % len(left_nodes)]
+                right = right_nodes[k % len(right_nodes)]
+                self._add_undirected_edge(edges, left, bridge_nodes[0])
+                for a, b in zip(bridge_nodes[:-1], bridge_nodes[1:]):
+                    self._add_undirected_edge(edges, a, b)
+                self._add_undirected_edge(edges, bridge_nodes[-1], right)
+        else:
+            for k in range(width):
+                left = left_nodes[k % len(left_nodes)]
+                right = right_nodes[k % len(right_nodes)]
+                self._add_undirected_edge(edges, left, right)
+
+        y = torch.zeros(num_nodes, dtype=torch.long)
+        y[right_nodes] = 1 if self.n_classes > 1 else 0
+        if bridge_nodes:
+            y[bridge_nodes] = 0
+        if self.n_classes > 2:
+            y = torch.tensor(self._rng.integers(0, self.n_classes, size=num_nodes), dtype=torch.long)
+        return self._edge_index_from_edges(edges), y
+
+    def _build_sbm(self):
+        if self.n_classes <= 0:
+            raise ValueError("num_classes must be positive.")
+        block_sizes = np.full(self.n_classes, self.num_nodes // self.n_classes, dtype=int)
+        block_sizes[:self.num_nodes % self.n_classes] += 1
+        labels = np.repeat(np.arange(self.n_classes), block_sizes)
+        edges = set()
+
+        for u in range(self.num_nodes):
+            for v in range(u + 1, self.num_nodes):
+                prob = self.sbm_intra_prob if labels[u] == labels[v] else self.sbm_inter_prob
+                if self._rng.random() < prob:
+                    self._add_undirected_edge(edges, u, v)
+
+        starts = np.cumsum(np.concatenate(([0], block_sizes[:-1])))
+        width = max(1, self.bridge_width)
+        for block in range(self.n_classes - 1):
+            left_start = starts[block]
+            right_start = starts[block + 1]
+            for k in range(width):
+                u = int(left_start + (k % block_sizes[block]))
+                v = int(right_start + (k % block_sizes[block + 1]))
+                self._add_undirected_edge(edges, u, v)
+
+        return self._edge_index_from_edges(edges), torch.tensor(labels, dtype=torch.long)
+
+    def generate_edges_and_labels(self):
+        if self.graph_type == 'barbell' or self.graph_type == 'path_barbell':
+            return self._build_barbell()
+        if self.graph_type == 'sbm':
+            return self._build_sbm()
+        raise ValueError(f"Unknown bottleneck graph type {self.graph_type}")
+
+    def generate_features(self, y):
+        torch_gen = torch.Generator().manual_seed(self.seed)
+        if self.feature_mode == 'random':
+            class_centres = torch.randn(self.n_classes, self.num_feats, generator=torch_gen)
+            noise = self.feat_noise * torch.randn(y.size(0), self.num_feats, generator=torch_gen)
+            return (class_centres[y] + noise).float()
+        if self.feature_mode == 'ellipsoid':
+            axes = torch.tensor(
+                self._rng.random((self.n_classes, self.num_feats)),
+                dtype=torch.float32
+            ).clamp_min(1e-3)
+            directions = torch.randn(y.size(0), self.num_feats, generator=torch_gen)
+            directions = directions / directions.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            x = axes[y] * (self.r * directions)
+            noise = torch.randn(y.size(0), self.num_feats, generator=torch_gen)
+            x = x + self.feat_noise * axes[y] * noise
+            return x.float()
+        raise ValueError(f"Unknown bottleneck feature mode {self.feature_mode}")
+
+    def download(self):
+        edge_index, y = self.generate_edges_and_labels()
+        x = self.generate_features(y)
+        data = Data(x=x, edge_index=edge_index, y=y)
+        data.graph_type = self.graph_type
+        data.bridge_width = self.bridge_width
+        data.feature_mode = self.feature_mode
+        torch.save(data, self.raw_paths[0])
+
+    def process(self):
+        data = torch.load(self.raw_paths[0], weights_only=False)
+        edge_index, _ = remove_self_loops(data.edge_index)
+        edge_index, _ = coalesce(edge_index, None, data.x.size(0), data.x.size(0))
+        data = Data(x=data.x, edge_index=edge_index, y=data.y)
+        data = data if self.pre_transform is None else self.pre_transform(data)
+        torch.save(self.collate([data]), self.processed_paths[0])
+
+    def __repr__(self):
+        return '{}()'.format(self.name)
+
+
 def get_fixed_splits(data, dataset_name, seed):
     try:
         with np.load(f'splits/{dataset_name}_split_0.6_0.2_{seed}.npz') as splits_file:
@@ -522,6 +683,8 @@ def get_dataset(name, args):
         dataset = Planetoid(root=data_root, name=name, transform=T.NormalizeFeatures())
     elif name == "synthetic_exp":
         dataset = SyntheticData(data_root,name, args)
+    elif name == "bottleneck_exp":
+        dataset = BottleneckData(data_root, name, args)
     elif name == 'ogbn-arxiv':
         dataset = torch.load(data_root+'/ogbn_arxiv/processed/geometric_data_processed.pt', weights_only=False)
         edge_index = dataset[0].edge_index 

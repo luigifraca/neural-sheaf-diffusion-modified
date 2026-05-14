@@ -159,6 +159,23 @@ def run_exp(args, dataset, model_cls, fold):
 
             if args["dataset"] == "synthetic_exp":
                 lap_filename = f"{args['model']}_nodes-{args['num_nodes']}_node-deg-{args['node_degree']}_layer{layer}_pct-hetero-{int(float(args['het_coef'])*100)}_classes-{args['num_classes']}_feats-{args['num_feats']}_seed{args['seed']}.pt"
+            elif args["dataset"] == "bottleneck_exp":
+                lap_filename = (
+                    f"{args['model']}_graph-{args['bottleneck_graph']}"
+                    f"_nodes-{args['num_nodes']}"
+                    f"_left-{args['bottleneck_left']}"
+                    f"_right-{args['bottleneck_right']}"
+                    f"_bridge-width-{args['bridge_width']}"
+                    f"_bridge-length-{args['bridge_length']}"
+                    f"_sbm-intra-{args['sbm_intra_prob']}"
+                    f"_sbm-inter-{args['sbm_inter_prob']}"
+                    f"_features-{args['bottleneck_feature_mode']}"
+                    f"_layer{layer}"
+                    f"_classes-{args['num_classes']}"
+                    f"_feats-{args['num_feats']}"
+                    f"_fold{fold}"
+                    f"_seed{args['seed']}.pt"
+                )
             else:
                 lap_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}.pt"
             
@@ -187,6 +204,23 @@ def run_exp(args, dataset, model_cls, fold):
 
             if args["dataset"] == "synthetic_exp":
                 maps_filename = f"{args['model']}_nodes-{args['num_nodes']}_node-deg-{args['node_degree']}_layer{layer}_pct-hetero-{int(float(args['het_coef'])*100)}_classes-{args['num_classes']}_feats-{args['num_feats']}_seed{args['seed']}.pt"
+            elif args["dataset"] == "bottleneck_exp":
+                maps_filename = (
+                    f"{args['model']}_graph-{args['bottleneck_graph']}"
+                    f"_nodes-{args['num_nodes']}"
+                    f"_left-{args['bottleneck_left']}"
+                    f"_right-{args['bottleneck_right']}"
+                    f"_bridge-width-{args['bridge_width']}"
+                    f"_bridge-length-{args['bridge_length']}"
+                    f"_sbm-intra-{args['sbm_intra_prob']}"
+                    f"_sbm-inter-{args['sbm_inter_prob']}"
+                    f"_features-{args['bottleneck_feature_mode']}"
+                    f"_layer{layer}"
+                    f"_classes-{args['num_classes']}"
+                    f"_feats-{args['num_feats']}"
+                    f"_fold{fold}"
+                    f"_seed{args['seed']}.pt"
+                )
             else:
                 maps_filename = f"{args['model']}_{args['dataset']}_layer{layer}_fold{fold}_seed{args['seed']}.pt"
 

@@ -119,5 +119,23 @@ def get_parser():
     parser.add_argument("--classes_corr", type=list_of_floats, default=None,
                     help="Custom class correlation matrix, as a flat comma-separated list.")
 
+    # Bottleneck synthetic dataset parameters
+    parser.add_argument("--bottleneck_graph", type=str, default="barbell",
+                    help="Topology for bottleneck_exp: barbell, path_barbell, or sbm.")
+    parser.add_argument("--bottleneck_left", type=int, default=80,
+                    help="Number of nodes in the left community for barbell-style graphs.")
+    parser.add_argument("--bottleneck_right", type=int, default=80,
+                    help="Number of nodes in the right community for barbell-style graphs.")
+    parser.add_argument("--bridge_width", type=int, default=1,
+                    help="Number of cross-community bridge edges to force.")
+    parser.add_argument("--bridge_length", type=int, default=0,
+                    help="Number of intermediate path nodes for path_barbell.")
+    parser.add_argument("--sbm_intra_prob", type=float, default=0.25,
+                    help="Within-block edge probability for bottleneck_exp SBM graphs.")
+    parser.add_argument("--sbm_inter_prob", type=float, default=0.005,
+                    help="Between-block edge probability for bottleneck_exp SBM graphs.")
+    parser.add_argument("--bottleneck_feature_mode", type=str, default="ellipsoid",
+                    help="Feature generation for bottleneck_exp: random or ellipsoid.")
+
     
     return parser
