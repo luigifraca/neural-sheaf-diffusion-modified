@@ -70,6 +70,7 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
 
         #print(f"Input x size: {x.detach().cpu().numpy().shape}")
 
+        self._reset_node_representations(x)
         x = F.dropout(x, p=self.input_dropout, training=self.training)
         x = self.lin1(x)
         if self.use_act:
@@ -78,6 +79,7 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
         if self.second_linear:
             x = self.lin12(x)
         x = x.view(self.graph_size * self.final_d, -1)
+        self._store_node_representation("encoded", x)
         #print(f"After initial linear layers x size: {x.detach().cpu().numpy().shape}")
 
         x0 = x
@@ -120,9 +122,12 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
             coeff = (1 + torch.tanh(self.epsilons[layer]).tile(self.graph_size, 1))
             x0 = coeff * x0 - x
             x = x0
+            self._store_node_representation(f"layer{layer}", x)
 
         x = x.reshape(self.graph_size, -1)
+        self._store_node_representation("pre_logits", x)
         x = self.lin2(x)
+        self._store_node_representation("logits", x)
         return F.log_softmax(x, dim=1)
 
 class DiscreteBundleSheafDiffusion(SheafDiffusion):
@@ -195,6 +200,7 @@ class DiscreteBundleSheafDiffusion(SheafDiffusion):
             weight_learner.update_edge_index(edge_index)
 
     def forward(self, x):
+        self._reset_node_representations(x)
         x = F.dropout(x, p=self.input_dropout, training=self.training)
         x = self.lin1(x)
         if self.use_act:
@@ -203,6 +209,7 @@ class DiscreteBundleSheafDiffusion(SheafDiffusion):
         if self.second_linear:
             x = self.lin12(x)
         x = x.view(self.graph_size * self.final_d, -1)
+        self._store_node_representation("encoded", x)
 
         x0, L = x, None
         self._last_maps = {}
@@ -234,9 +241,12 @@ class DiscreteBundleSheafDiffusion(SheafDiffusion):
 
             x0 = (1 + torch.tanh(self.epsilons[layer]).tile(self.graph_size, 1)) * x0 - x
             x = x0
+            self._store_node_representation(f"layer{layer}", x)
 
         x = x.reshape(self.graph_size, -1)
+        self._store_node_representation("pre_logits", x)
         x = self.lin2(x)
+        self._store_node_representation("logits", x)
         return F.log_softmax(x, dim=1)
 
 
@@ -294,6 +304,7 @@ class DiscreteGeneralSheafDiffusion(SheafDiffusion):
         return x
 
     def forward(self, x):
+        self._reset_node_representations(x)
         x = F.dropout(x, p=self.input_dropout, training=self.training)
         x = self.lin1(x)
         if self.use_act:
@@ -303,6 +314,7 @@ class DiscreteGeneralSheafDiffusion(SheafDiffusion):
         if self.second_linear:
             x = self.lin12(x)
         x = x.view(self.graph_size * self.final_d, -1)
+        self._store_node_representation("encoded", x)
 
         x0, L = x, None
         self._last_maps = {}
@@ -332,10 +344,13 @@ class DiscreteGeneralSheafDiffusion(SheafDiffusion):
 
             x0 = (1 + torch.tanh(self.epsilons[layer]).tile(self.graph_size, 1)) * x0 - x
             x = x0
+            self._store_node_representation(f"layer{layer}", x)
 
         # To detect the numerical instabilities of SVD.
         assert torch.all(torch.isfinite(x))
 
         x = x.reshape(self.graph_size, -1)
+        self._store_node_representation("pre_logits", x)
         x = self.lin2(x)
+        self._store_node_representation("logits", x)
         return F.log_softmax(x, dim=1)

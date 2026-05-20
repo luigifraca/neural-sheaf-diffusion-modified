@@ -137,5 +137,21 @@ def get_parser():
     parser.add_argument("--bottleneck_feature_mode", type=str, default="ellipsoid",
                     help="Feature generation for bottleneck_exp: random or ellipsoid.")
 
+    # Circle node-classification synthetic dataset parameters
+    parser.add_argument("--circle_topology", type=str, default="circle",
+                    help="Topology for circle_exp: circle, crossed_circle, or knn_circle.")
+    parser.add_argument("--circle_nodes", type=int, default=64,
+                    help="Number of nodes arranged around the circle for circle_exp.")
+    parser.add_argument("--circle_k", type=int, default=1,
+                    help="Number of ring hops per side, or k-nearest circular neighbours for knn_circle.")
+    parser.add_argument("--circle_cross_stride", type=int, default=2,
+                    help="Stride for graph-transfer-style crossed_circle chords.")
+    parser.add_argument("--circle_side_margin", type=float, default=0.35,
+                    help="Horizontal margin: x < -margin is left, x > margin is right, otherwise upper/lower.")
+    parser.add_argument("--circle_feature_mode", type=str, default="coords",
+                    help="Feature generation for circle_exp: coords, class_signal, or coords_class_signal.")
+    parser.add_argument("--circle_feature_noise", type=float, default=0.05,
+                    help="Gaussian feature noise for circle_exp.")
+
     
     return parser

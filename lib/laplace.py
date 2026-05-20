@@ -7,6 +7,7 @@ import math
 import torch
 import torch_sparse
 
+from lib.edge_coupling import validate_edge_index
 from torch_geometric.utils import degree
 
 
@@ -311,6 +312,7 @@ def append_diag_maps_to_existent_laplacian(size, learnable_d, L, edge_index, val
 
 def compute_left_right_map_index(edge_index, full_matrix=False):
     """Computes indices for lower triangular matrix or full matrix"""
+    validate_edge_index(edge_index)
     edge_to_idx = dict()
     for e in range(edge_index.size(1)):
         source = edge_index[0, e].item()
@@ -479,5 +481,4 @@ def get_1d_oracle_maps(edge_index, y):
         else:
             maps[i] = -1.0
     return maps.view(-1, 1)
-
 

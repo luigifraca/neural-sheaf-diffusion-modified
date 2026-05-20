@@ -624,6 +624,159 @@ class BottleneckData(InMemoryDataset):
         return '{}()'.format(self.name)
 
 
+class CircleNodeClassificationData(InMemoryDataset):
+    """Graph-transfer-style circle graph with side-based node labels.
+
+    Classes are zero-indexed for PyTorch:
+    0 = left side, 1 = right side, 2 = upper/lower arcs.
+    """
+
+    def __init__(self, root, name, args, transform=None, pre_transform=None):
+        self.name = name.lower()
+        assert self.name in ['circle_exp']
+        self.graph_type = args.circle_topology.lower()
+        self.num_nodes = args.circle_nodes
+        self.n_classes = 3
+        self.num_feats = args.num_feats
+        self.circle_k = args.circle_k
+        self.cross_stride = args.circle_cross_stride
+        self.side_margin = args.circle_side_margin
+        self.feature_mode = args.circle_feature_mode.lower()
+        self.feature_noise = args.circle_feature_noise
+        self.seed = args.seed
+        self._rng = np.random.default_rng(self.seed)
+        super(CircleNodeClassificationData, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
+
+    @property
+    def raw_dir(self):
+        return osp.join(self.root, self.name, 'raw')
+
+    @property
+    def processed_dir(self):
+        return osp.join(self.root, self.name, 'processed')
+
+    @property
+    def raw_file_names(self):
+        return 'circle_node_classification_data.pt'
+
+    @property
+    def processed_file_names(self):
+        return 'data.pt'
+
+    def _add_undirected_edge(self, edges, u, v):
+        if u != v:
+            edges.add((min(int(u), int(v)), max(int(u), int(v))))
+
+    def _edge_index_from_edges(self, edges):
+        edge_index = [[], []]
+        for u, v in sorted(edges):
+            edge_index[0] += [u, v]
+            edge_index[1] += [v, u]
+        return torch.tensor(edge_index, dtype=torch.long)
+
+    def generate_positions(self):
+        if self.num_nodes < 8:
+            raise ValueError("circle_nodes must be at least 8 so all three side classes are present.")
+        angles = np.linspace(0.0, 2.0 * np.pi, self.num_nodes, endpoint=False)
+        pos = np.stack([np.cos(angles), np.sin(angles)], axis=1)
+        return torch.tensor(pos, dtype=torch.float32)
+
+    def generate_labels(self, pos):
+        x_coord = pos[:, 0].numpy()
+        y = np.full(self.num_nodes, 2, dtype=np.int64)
+        y[x_coord < -self.side_margin] = 0
+        y[x_coord > self.side_margin] = 1
+        labels = torch.tensor(y, dtype=torch.long)
+        if torch.unique(labels).numel() != self.n_classes:
+            raise ValueError(
+                "circle_side_margin produced an empty class. "
+                "Try a smaller margin or more circle_nodes."
+            )
+        return labels
+
+    def generate_edges(self):
+        edges = set()
+        k = max(1, int(self.circle_k))
+        for node in range(self.num_nodes):
+            for hop in range(1, k + 1):
+                self._add_undirected_edge(edges, node, (node + hop) % self.num_nodes)
+
+        if self.graph_type == 'circle':
+            return self._edge_index_from_edges(edges)
+
+        if self.graph_type == 'crossed_circle':
+            half = self.num_nodes // 2
+            stride = max(1, int(self.cross_stride))
+            for node in range(0, half, stride):
+                self._add_undirected_edge(edges, node, self.num_nodes - 1 - node)
+                reflected = self.num_nodes + 1 - node
+                if reflected < self.num_nodes:
+                    self._add_undirected_edge(edges, node, reflected)
+            return self._edge_index_from_edges(edges)
+
+        if self.graph_type == 'knn_circle':
+            return self._edge_index_from_edges(edges)
+
+        raise ValueError(f"Unknown circle graph type {self.graph_type}")
+
+    def generate_features(self, pos, y):
+        torch_gen = torch.Generator().manual_seed(self.seed)
+        num_nodes = y.size(0)
+        if self.num_feats <= 0:
+            raise ValueError("num_feats must be positive for circle_exp.")
+
+        if self.feature_mode == 'coords':
+            x = torch.zeros(num_nodes, self.num_feats, dtype=torch.float32)
+            x[:, :min(2, self.num_feats)] = pos[:, :min(2, self.num_feats)]
+            if self.num_feats > 2:
+                x[:, 2:] = torch.randn(num_nodes, self.num_feats - 2, generator=torch_gen)
+        elif self.feature_mode == 'class_signal':
+            class_centres = torch.randn(self.n_classes, self.num_feats, generator=torch_gen)
+            x = class_centres[y]
+        elif self.feature_mode == 'coords_class_signal':
+            x = torch.zeros(num_nodes, self.num_feats, dtype=torch.float32)
+            coord_dims = min(2, self.num_feats)
+            x[:, :coord_dims] = pos[:, :coord_dims]
+            remaining = self.num_feats - coord_dims
+            if remaining > 0:
+                class_centres = torch.randn(self.n_classes, remaining, generator=torch_gen)
+                x[:, coord_dims:] = class_centres[y]
+        else:
+            raise ValueError(f"Unknown circle feature mode {self.feature_mode}")
+
+        if self.feature_noise > 0:
+            x = x + self.feature_noise * torch.randn(x.shape, generator=torch_gen)
+        return x.float()
+
+    def download(self):
+        pos = self.generate_positions()
+        y = self.generate_labels(pos)
+        edge_index = self.generate_edges()
+        x = self.generate_features(pos, y)
+        data = Data(x=x, edge_index=edge_index, y=y, pos=pos)
+        data.node_role = y.clone()
+        data.circle_topology = self.graph_type
+        data.circle_side_margin = float(self.side_margin)
+        data.circle_feature_mode = self.feature_mode
+        torch.save(data, self.raw_paths[0])
+
+    def process(self):
+        data = torch.load(self.raw_paths[0], weights_only=False)
+        edge_index, _ = remove_self_loops(data.edge_index)
+        edge_index, _ = coalesce(edge_index, None, data.x.size(0), data.x.size(0))
+        processed = Data(x=data.x, edge_index=edge_index, y=data.y, pos=data.pos)
+        processed.node_role = data.node_role
+        processed.circle_topology = data.circle_topology
+        processed.circle_side_margin = data.circle_side_margin
+        processed.circle_feature_mode = data.circle_feature_mode
+        processed = processed if self.pre_transform is None else self.pre_transform(processed)
+        torch.save(self.collate([processed]), self.processed_paths[0])
+
+    def __repr__(self):
+        return '{}()'.format(self.name)
+
+
 def get_fixed_splits(data, dataset_name, seed):
     try:
         with np.load(f'splits/{dataset_name}_split_0.6_0.2_{seed}.npz') as splits_file:
@@ -685,6 +838,8 @@ def get_dataset(name, args):
         dataset = SyntheticData(data_root,name, args)
     elif name == "bottleneck_exp":
         dataset = BottleneckData(data_root, name, args)
+    elif name == "circle_exp":
+        dataset = CircleNodeClassificationData(data_root, name, args)
     elif name == 'ogbn-arxiv':
         dataset = torch.load(data_root+'/ogbn_arxiv/processed/geometric_data_processed.pt', weights_only=False)
         edge_index = dataset[0].edge_index 

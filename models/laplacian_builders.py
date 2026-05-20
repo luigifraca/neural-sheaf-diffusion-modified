@@ -7,6 +7,7 @@ import lib.laplace as lap
 from torch import nn
 from torch_scatter import scatter_add
 from torch_geometric.utils import degree
+from lib.edge_coupling import validate_edge_index
 from models.orthogonal import Orthogonal
 
 
@@ -24,6 +25,7 @@ class LaplacianBuilder(nn.Module):
         if add_lp:
             self.final_d += 1
         self.size = size
+        validate_edge_index(edge_index, num_nodes=size)
         self.edges = edge_index.size(1) // 2
         self.edge_index = edge_index
         self.normalised = normalised
@@ -338,4 +340,3 @@ class GeneralLaplacianBuilder(LaplacianBuilder):
         edge_index, weights = lap.mergesp(non_diag_indices, non_diag_values, diag_indices, diag_maps)
 
         return (edge_index, weights), saved_tril_maps
-

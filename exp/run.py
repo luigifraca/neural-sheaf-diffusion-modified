@@ -24,6 +24,7 @@ from exp.parser import get_parser
 from models.positional_encodings import append_top_k_evectors
 from models.cont_models import DiagSheafDiffusion, BundleSheafDiffusion, GeneralSheafDiffusion
 from models.disc_models import DiscreteDiagSheafDiffusion, DiscreteBundleSheafDiffusion, DiscreteGeneralSheafDiffusion
+from lib.edge_coupling import sort_edge_index_with_values, sort_sparse_entries, validate_edge_index
 from utils.heterophilic import get_dataset, get_fixed_splits
 
 
@@ -73,6 +74,7 @@ def run_exp(args, dataset, model_cls, fold):
 
     model = model_cls(data.edge_index, args)
     model = model.to(args['device'])
+    validate_edge_index(model.edge_index, num_nodes=args['graph_size'])
 
     sheaf_learner_params, other_params = model.grouped_parameters()
     optimizer = torch.optim.Adam([
@@ -134,27 +136,32 @@ def run_exp(args, dataset, model_cls, fold):
             for i in range(0, args['layers']):
                 print(f"Epsilons {i}: {model.epsilons[i].detach().cpu().numpy().flatten()}")
 
-    if (hasattr(model, '_last_maps') and model._last_maps is not None) \
-        and (hasattr(model, '_last_laplacian') and model._last_laplacian[0] is not None) \
-        and (hasattr(model, '_last_laplacian') and model._last_laplacian[1] is not None):
+    last_maps = getattr(model, '_last_maps', None)
+    last_laplacian = getattr(model, '_last_laplacian', None)
+    last_node_representations = getattr(model, '_last_node_representations', None)
+    if last_maps and last_laplacian:
         
         if args["dataset"] == "synthetic_exp":
             maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
             lap_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'laplacians', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
+            repr_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'representations', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
         else:        
             maps_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'maps', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
             lap_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'laplacians', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
+            repr_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results', 'representations', f'{args["dataset"]}', f"normalised-{str(args['normalised']).lower()}", f'stalk_dim-{args["d"]}',f'{args["layers"]}-layers', f'{args["hidden_channels"]}-hidden', f'{args["epochs"]}-epochs'))
         
         os.makedirs(maps_dir, exist_ok=True)
         os.makedirs(lap_dir, exist_ok=True)
+        os.makedirs(repr_dir, exist_ok=True)
 
-        for layer, lap in model._last_laplacian.items():
+        for layer, lap in last_laplacian.items():
             lap_indices = lap[0].detach().cpu()
             lap_values = lap[1].detach().cpu()
 
             if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
                 raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
 
+            lap_indices, lap_values = sort_sparse_entries(lap_indices, lap_values)
             lap_matrix = torch.cat([lap_indices, lap_values.unsqueeze(0)], dim=0)
 
             if args["dataset"] == "synthetic_exp":
@@ -183,10 +190,10 @@ def run_exp(args, dataset, model_cls, fold):
             torch.save(lap_matrix, lap_path)
             print(f"Saved Laplacian to {lap_path} with shape {tuple(lap_matrix.shape)}")
 
-        for layer, maps in model._last_maps.items():
+        for layer, maps in last_maps.items():
             
             maps = maps.detach().cpu()
-            lap_indices = model._last_laplacian[layer][0].detach().cpu()
+            map_edge_index = model.edge_index.detach().cpu()
         
             if maps.dim() == 0:
                 maps = maps.unsqueeze(0)
@@ -195,12 +202,15 @@ def run_exp(args, dataset, model_cls, fold):
             else:
                 maps_cols = maps.reshape(maps.shape[0], -1)
 
-            if lap_indices.dim() != 2 or lap_indices.size(0) != 2:
-                raise ValueError(f"Expected Laplacian indices of shape [2, N], got {tuple(lap_indices.shape)}")
+            if map_edge_index.size(1) != maps_cols.size(0):
+                raise ValueError(
+                    f"Expected one learned map per directed edge, got {maps_cols.size(0)} maps "
+                    f"for {map_edge_index.size(1)} edges."
+                )
 
-            num_entries = min(lap_indices.size(1), maps_cols.size(0))
-            edge_cols = lap_indices[:, :num_entries].t().to(maps_cols.dtype)
-            maps_matrix = torch.cat([edge_cols, maps_cols[:num_entries]], dim=1)
+            map_edge_index, maps_cols = sort_edge_index_with_values(map_edge_index, maps_cols)
+            edge_cols = map_edge_index.t().to(maps_cols.dtype)
+            maps_matrix = torch.cat([edge_cols, maps_cols], dim=1)
 
             if args["dataset"] == "synthetic_exp":
                 maps_filename = f"{args['model']}_nodes-{args['num_nodes']}_node-deg-{args['node_degree']}_layer{layer}_pct-hetero-{int(float(args['het_coef'])*100)}_classes-{args['num_classes']}_feats-{args['num_feats']}_seed{args['seed']}.pt"
@@ -226,6 +236,50 @@ def run_exp(args, dataset, model_cls, fold):
 
             maps_path = os.path.join(maps_dir, maps_filename)
             torch.save(maps_matrix, maps_path)
+
+        if last_node_representations:
+            representation_payload = {
+                "representations": {
+                    name: value.detach().cpu() if torch.is_tensor(value) else value
+                    for name, value in last_node_representations.items()
+                },
+                "metadata": {
+                    "dataset": args["dataset"],
+                    "model": args["model"],
+                    "normalised": bool(args["normalised"]),
+                    "stalk_dim": int(args["d"]),
+                    "layers": int(args["layers"]),
+                    "hidden_channels": int(args["hidden_channels"]),
+                    "epochs": int(args["epochs"]),
+                    "fold": int(fold),
+                    "seed": int(args["seed"]),
+                    "best_epoch": int(best_epoch),
+                    "saved_after_epoch": int(epoch),
+                },
+            }
+
+            if args["dataset"] == "bottleneck_exp":
+                repr_filename = (
+                    f"{args['model']}_graph-{args['bottleneck_graph']}"
+                    f"_nodes-{args['num_nodes']}"
+                    f"_left-{args['bottleneck_left']}"
+                    f"_right-{args['bottleneck_right']}"
+                    f"_bridge-width-{args['bridge_width']}"
+                    f"_bridge-length-{args['bridge_length']}"
+                    f"_sbm-intra-{args['sbm_intra_prob']}"
+                    f"_sbm-inter-{args['sbm_inter_prob']}"
+                    f"_features-{args['bottleneck_feature_mode']}"
+                    f"_classes-{args['num_classes']}"
+                    f"_feats-{args['num_feats']}"
+                    f"_fold{fold}"
+                    f"_seed{args['seed']}.pt"
+                )
+            else:
+                repr_filename = f"{args['model']}_{args['dataset']}_fold{fold}_seed{args['seed']}.pt"
+
+            repr_path = os.path.join(repr_dir, repr_filename)
+            torch.save(representation_payload, repr_path)
+            print(f"Saved node representations to {repr_path}")
 
     wandb.log({'best_test_acc': test_acc, 'best_val_acc': best_val_acc, 'best_epoch': best_epoch})
     keep_running = False if test_acc < args['min_acc'] else True

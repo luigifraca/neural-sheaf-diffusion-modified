@@ -3,6 +3,7 @@
 
 import torch
 from torch import nn
+from lib.edge_coupling import validate_edge_index
 
 
 class SheafDiffusion(nn.Module):
@@ -13,6 +14,7 @@ class SheafDiffusion(nn.Module):
 
         assert args['d'] > 0
         self.d = args['d']
+        validate_edge_index(edge_index, num_nodes=args['graph_size'])
         self.edge_index = edge_index
         self.add_lp = args['add_lp']
         self.add_hp = args['add_hp']
@@ -49,9 +51,24 @@ class SheafDiffusion(nn.Module):
         self.laplacian_builder = None
 
     def update_edge_index(self, edge_index):
-        assert edge_index.max() <= self.graph_size
+        validate_edge_index(edge_index, num_nodes=self.graph_size)
         self.edge_index = edge_index
         self.laplacian_builder = self.laplacian_builder.create_with_new_edge_index(edge_index)
+
+    def _reset_node_representations(self, x=None):
+        self._last_node_representations = {}
+        if x is not None:
+            self._store_node_representation("input", x)
+
+    def _store_node_representation(self, name, x):
+        x_detached = x.detach()
+        if x_detached.dim() == 1:
+            x_detached = x_detached.unsqueeze(-1)
+        if x_detached.size(0) == self.graph_size * self.final_d:
+            x_detached = x_detached.reshape(self.graph_size, -1)
+        elif x_detached.size(0) == self.graph_size:
+            x_detached = x_detached.reshape(self.graph_size, -1)
+        self._last_node_representations[name] = x_detached.cpu()
 
     def grouped_parameters(self):
         sheaf_learners, others = [], []
