@@ -48,7 +48,7 @@ class RealDatasetExperimentConfig:
     early_stopping: int = 200
     left_weights: bool = True
     right_weights: bool = True
-    use_act: bool = True
+    use_act: bool = True # default True, try using False
     add_hp: bool = False
     add_lp: bool = False
     edge_weights: bool = True

@@ -325,8 +325,12 @@ if __name__ == '__main__':
     except: 
         args.output_dim = torch.unique(dataset[0].y).shape[0]  # ← fallback for plain lists
 
-
-    args.device = torch.device(f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu')
+    # I want to include the MPS Apple acceletor
+    args.device = torch.device(
+        f'cuda:{args.cuda}' if torch.cuda.is_available() 
+        else 'mps' if torch.backends.mps.is_available() and torch.backends.mps.is_built()
+        else 'cpu'
+    )
 
     # I AM COMMENTING THIS TO TRY UNNORMALISATION
     # assert args.normalised or args.deg_normalised

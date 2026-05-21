@@ -104,6 +104,11 @@ class DiscreteDiagSheafDiffusion(SheafDiffusion):
                 # print(f"Layer {layer} maps: {self._last_maps.detach().cpu().numpy()}")
                 # print(f"Layer {layer} Laplacian: {self._last_laplacian[0].detach().cpu().numpy()}, {self._last_laplacian[1].detach().cpu().numpy()}")
 
+            if not self.nonlinear:
+                self._last_maps = {layer: maps for layer in range(self.layers)}
+                self._last_trans_maps = {layer: trans_maps for layer in range(self.layers)}
+                self._last_laplacian = {layer: L for layer in range(self.layers)}
+
             x = F.dropout(x, p=self.dropout, training=self.training)
 
             if self.left_weights:
@@ -228,6 +233,10 @@ class DiscreteBundleSheafDiffusion(SheafDiffusion):
                 self._last_trans_maps[layer] = trans_maps
                 self._last_laplacian[layer] = L
 
+            if not self.nonlinear:
+                self._last_maps = {layer: maps for layer in range(self.layers)}
+                self._last_trans_maps = {layer: trans_maps for layer in range(self.layers)}
+                self._last_laplacian = {layer: L for layer in range(self.layers)}
 
             x = F.dropout(x, p=self.dropout, training=self.training)
 
@@ -331,6 +340,11 @@ class DiscreteGeneralSheafDiffusion(SheafDiffusion):
                 self._last_maps[layer] = maps
                 self._last_trans_maps[layer] = trans_maps
                 self._last_laplacian[layer] = L
+
+            if not self.nonlinear:
+                self._last_maps = {layer: maps for layer in range(self.layers)}
+                self._last_trans_maps = {layer: trans_maps for layer in range(self.layers)}
+                self._last_laplacian = {layer: L for layer in range(self.layers)}
 
             x = F.dropout(x, p=self.dropout, training=self.training)
 

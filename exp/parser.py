@@ -38,7 +38,7 @@ def get_parser():
                         help="Use a normalised Laplacian")
     parser.add_argument('--deg_normalised', dest='deg_normalised', type=str2bool, default=False,
                         help="Use a a degree-normalised Laplacian")
-    parser.add_argument('--linear', dest='linear', type=str2bool, default=False,
+    parser.add_argument('--linear', dest='linear', type=str2bool, default=False, # deafult=False, try using True ie.: learning just one laplacian and using throughout the entire diffusion
                         help="Whether to learn a new Laplacian at each step.")
     parser.add_argument('--hidden_channels', type=int, default=20)
     parser.add_argument('--input_dropout', type=float, default=0.0)
@@ -51,7 +51,7 @@ def get_parser():
                         help="Adds fixed high pass filter in the restriction maps")
     parser.add_argument('--add_hp', dest='add_hp', type=str2bool, default=False,
                         help="Adds fixed low pass filter in the restriction maps")
-    parser.add_argument('--use_act', dest='use_act', type=str2bool, default=True)
+    parser.add_argument('--use_act', dest='use_act', type=str2bool, default=True) # deafult True, try using False
     parser.add_argument('--second_linear', dest='second_linear', type=str2bool, default=False)
     parser.add_argument('--orth', type=str, choices=['matrix_exp', 'cayley', 'householder', 'euler'],
                         default='householder', help="Parametrisation to use for the orthogonal group.")
